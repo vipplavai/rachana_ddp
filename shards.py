@@ -126,11 +126,10 @@ def prepare_shards(rank, world_size, output_dir):
         logging.info(f"Validation directory: {valid_dir}")
         logging.info(f"Test directory: {test_dir}")
 
-        # Tokenize and filter validation and test sets
+        # Save valid and test data without using the encoding parameter
         valid_data_file = os.path.join(valid_dir, 'valid.json')
         test_data_file = os.path.join(test_dir, 'test.json')
         
-        # Save valid and test data without using the encoding parameter
         valid_data.to_json(valid_data_file, force_ascii=False)
         test_data.to_json(test_data_file, force_ascii=False)
 
@@ -143,7 +142,6 @@ def prepare_shards(rank, world_size, output_dir):
         create_input_target_pairs(tokenized_test, test_dir, prefix='test')
 
         logging.info("Saved validation and test datasets on rank 0")
-
 
 # Run the shard preparation
 if __name__ == "__main__":
