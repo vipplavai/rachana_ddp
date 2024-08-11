@@ -40,16 +40,24 @@ def save_data_per_node(train_data, rank, world_size, output_dir):
     if len(node_data) == 0:
         logging.warning(f"No data assigned to rank {rank}. This can result in empty shard files.")
     else:
-        node_data.to_json(node_file, force_ascii=False)  # Ensure UTF-8 encoding
-        logging.info(f"Saved {len(node_data)} sentences to {node_file} for rank {rank}")
+        # Convert node data to a list of dictionaries
+        sentences = [{"Sentence": item['text']} for item in node_data]
+
+        # Save as a JSON array to ensure proper format
+        with open(node_file, 'w', encoding='utf-8') as f:
+            json.dump(sentences, f, ensure_ascii=False, indent=4)  # Use indent for readability
+
+        logging.info(f"Saved {len(sentences)} sentences to {node_file} for rank {rank}")
     
     return node_file
+
 
 # Tokenize and filter sentences
 def tokenize_and_filter_sentences(file_path, tokenizer):
     tokenized_sentences = []
     with open(file_path, 'r', encoding='utf-8') as f:
-        data = json.load(f)
+        data = json.load(f)  # This expects the file to be a valid JSON array
+
         for entry in data:
             sentence = entry.get('Sentence', '')
             tokens = tokenizer.encode(sentence)
@@ -61,6 +69,7 @@ def tokenize_and_filter_sentences(file_path, tokenizer):
 
     logging.info(f"Tokenized and filtered {len(tokenized_sentences)} sentences from {file_path}")
     return tokenized_sentences
+
 
 # Create input-target pairs and save as JSON files
 def create_input_target_pairs(tokenized_sentences, output_dir, prefix, chunk_size=3000):
