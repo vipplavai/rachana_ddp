@@ -26,6 +26,8 @@ def load_and_split_dataset():
 # Save data for each node
 def save_data_per_node(train_data, rank, world_size, output_dir):
     train_dir = os.path.join(output_dir, 'train')
+    node_output_dir = os.path.dirname(__file__)  # Directory where train.py is located
+
     os.makedirs(train_dir, exist_ok=True)  # Ensure the train directory exists
     logging.info(f"Train directory for rank {rank}: {train_dir}")
 
@@ -36,7 +38,7 @@ def save_data_per_node(train_data, rank, world_size, output_dir):
     end_idx = start_idx + sentences_per_node if rank != world_size - 1 else total_sentences
 
     node_data = train_data.select(range(start_idx, end_idx))
-    node_file = os.path.join(train_dir, f'node_{rank}.json')
+    node_file = os.path.join(node_output_dir, f'node_{rank}.json')  # Save in the same directory as train.py
 
     if len(node_data) == 0:
         logging.warning(f"No data assigned to rank {rank}. This can result in empty shard files.")

@@ -54,12 +54,16 @@ def reduce_tensor(tensor, world_size):
     rt /= world_size
     return rt
 
-# Paths and settings
+node_output_dir = os.path.dirname(__file__)  # Directory where train.py is located
 train_dir = "shards/train"
 valid_dir = "shards/valid"
 test_dir = "shards/test"
-output_dir = "rachana_ddp/shards"
-os.makedirs(output_dir, exist_ok=True)
+output_dir = os.path.join(node_output_dir, 'shards')  # Ensuring the base output directory is correct
+
+# Ensure directories exist
+os.makedirs(train_dir, exist_ok=True)
+os.makedirs(valid_dir, exist_ok=True)
+os.makedirs(test_dir, exist_ok=True)
 
 # Initialize the GPT-2 model
 config = GPT2Config(
