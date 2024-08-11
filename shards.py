@@ -27,6 +27,7 @@ def load_and_split_dataset():
 def save_data_per_node(train_data, rank, world_size, output_dir):
     train_dir = os.path.join(output_dir, 'train')
     os.makedirs(train_dir, exist_ok=True)  # Ensure the train directory exists
+    logging.info(f"Train directory for rank {rank}: {train_dir}")
 
     total_sentences = len(train_data)
     sentences_per_node = total_sentences // world_size
@@ -40,10 +41,8 @@ def save_data_per_node(train_data, rank, world_size, output_dir):
     if len(node_data) == 0:
         logging.warning(f"No data assigned to rank {rank}. This can result in empty shard files.")
     else:
-        # Replace 'text' with 'Sentence' as per your dataset structure
         sentences = [{"Sentence": item['Sentence']} for item in node_data]
 
-        # Save as a JSON array to ensure proper format
         with open(node_file, 'w', encoding='utf-8') as f:
             json.dump(sentences, f, ensure_ascii=False, indent=4)  # Use indent for readability
 
@@ -71,6 +70,8 @@ def tokenize_and_filter_sentences(file_path, tokenizer):
 # Create input-target pairs and save as JSON files
 def create_input_target_pairs(tokenized_sentences, output_dir, prefix, chunk_size=3000):
     os.makedirs(output_dir, exist_ok=True)
+    logging.info(f"Output directory for {prefix}: {output_dir}")
+
     num_chunks = len(tokenized_sentences) // chunk_size + (1 if len(tokenized_sentences) % chunk_size > 0 else 0)
     
     for i in range(num_chunks):
@@ -93,7 +94,7 @@ def create_input_target_pairs(tokenized_sentences, output_dir, prefix, chunk_siz
 
         json_file = os.path.join(output_dir, f'{prefix}_chunk_{i}.json')
         with open(json_file, 'w', encoding='utf-8') as f:
-            json.dump(input_target_pairs, f, ensure_ascii=False)  # Ensure UTF-8 encoding
+            json.dump(input_target_pairs, f, ensure_ascii=False)
 
         logging.info(f"Saved chunk {i+1}/{num_chunks} to {json_file}")
 
@@ -122,13 +123,18 @@ def prepare_shards(rank, world_size, output_dir):
         os.makedirs(valid_dir, exist_ok=True)
         os.makedirs(test_dir, exist_ok=True)
 
+        logging.info(f"Validation directory: {valid_dir}")
+        logging.info(f"Test directory: {test_dir}")
+
         # Tokenize and filter validation and test sets
         valid_data_file = os.path.join(valid_dir, 'valid.json')
         test_data_file = os.path.join(test_dir, 'test.json')
         
-        valid_data.to_json(valid_data_file, force_ascii=False, encoding='utf-8')
-        test_data.to_json(test_data_file, force_ascii=False, encoding='utf-8')
+        # Save valid and test data without using the encoding parameter
+        valid_data.to_json(valid_data_file, force_ascii=False)
+        test_data.to_json(test_data_file, force_ascii=False)
 
+        # Process and save the tokenized data
         tokenized_valid = tokenize_and_filter_sentences(valid_data_file, tokenizer)
         tokenized_test = tokenize_and_filter_sentences(test_data_file, tokenizer)
 
@@ -138,10 +144,13 @@ def prepare_shards(rank, world_size, output_dir):
 
         logging.info("Saved validation and test datasets on rank 0")
 
+
 # Run the shard preparation
 if __name__ == "__main__":
     rank = int(os.environ['RANK'])
     world_size = int(os.environ['WORLD_SIZE'])
-    output_dir = "shards"
+    output_dir = os.path.join(os.path.dirname(__file__), 'shards')
+    os.makedirs(output_dir, exist_ok=True)
+    logging.info(f"Output base directory: {output_dir}")
     
     prepare_shards(rank, world_size, output_dir)
