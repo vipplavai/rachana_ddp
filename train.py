@@ -54,6 +54,7 @@ def reduce_tensor(tensor, world_size):
     rt /= world_size
     return rt
 
+# Paths and settings
 node_output_dir = os.path.dirname(__file__)  # Directory where train.py is located
 train_dir = "shards/train"
 valid_dir = "shards/valid"
@@ -254,7 +255,9 @@ if __name__ == "__main__":
     setup(rank, world_size)
 
     # Wrap the model with DDP after initializing the process group
-    model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[0], output_device=0, find_unused_parameters=True)
+    # Wrap the model with DDP after initializing the process group
+    model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[0], output_device=0, find_unused_parameters=False)
+
 
     # Mixed precision and gradient accumulation setup
     scaler = GradScaler()
