@@ -58,7 +58,7 @@ def reduce_tensor(tensor, world_size):
 train_dir = "shards/train"
 valid_dir = "shards/valid"
 test_dir = "shards/test"
-output_dir = "models"
+output_dir = "rachana_dpp/shards"
 os.makedirs(output_dir, exist_ok=True)
 
 # Initialize the GPT-2 model
