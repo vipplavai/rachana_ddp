@@ -26,6 +26,7 @@ def load_and_split_dataset():
 # Save data for each node
 def save_data_per_node(train_data, rank, world_size, output_dir):
     train_dir = os.path.join(output_dir, 'train')
+    print(dataset[0])
     os.makedirs(train_dir, exist_ok=True)  # Ensure the train directory exists
 
     total_sentences = len(train_data)
