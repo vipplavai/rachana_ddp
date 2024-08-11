@@ -139,7 +139,7 @@ def collate_fn(batch):
 # Load JSON data
 def load_data_from_shard(shard_file):
     with open(shard_file, 'r') as f:
-        data = json.load(f)
+        data = [json.loads(line) for line in f]
     input_ids = [entry['input_ids'] for entry in data]
     target_ids = [entry['target_id'] for entry in data]
     return input_ids, target_ids
