@@ -26,7 +26,6 @@ def load_and_split_dataset():
 # Save data for each node
 def save_data_per_node(train_data, rank, world_size, output_dir):
     train_dir = os.path.join(output_dir, 'train')
-    print(dataset[0])
     os.makedirs(train_dir, exist_ok=True)  # Ensure the train directory exists
 
     total_sentences = len(train_data)
@@ -41,8 +40,8 @@ def save_data_per_node(train_data, rank, world_size, output_dir):
     if len(node_data) == 0:
         logging.warning(f"No data assigned to rank {rank}. This can result in empty shard files.")
     else:
-        # Convert node data to a list of dictionaries
-        sentences = [{"Sentence": item['text']} for item in node_data]
+        # Replace 'text' with 'Sentence' as per your dataset structure
+        sentences = [{"Sentence": item['Sentence']} for item in node_data]
 
         # Save as a JSON array to ensure proper format
         with open(node_file, 'w', encoding='utf-8') as f:
@@ -52,15 +51,13 @@ def save_data_per_node(train_data, rank, world_size, output_dir):
     
     return node_file
 
-
 # Tokenize and filter sentences
 def tokenize_and_filter_sentences(file_path, tokenizer):
     tokenized_sentences = []
     with open(file_path, 'r', encoding='utf-8') as f:
-        data = json.load(f)  # This expects the file to be a valid JSON array
-
+        data = json.load(f)
         for entry in data:
-            sentence = entry.get('Sentence', '')
+            sentence = entry.get('Sentence', '')  # Use 'Sentence' as the key
             tokens = tokenizer.encode(sentence)
             if len(tokens.ids) <= 256:
                 tokenized_sentences.append({
@@ -70,7 +67,6 @@ def tokenize_and_filter_sentences(file_path, tokenizer):
 
     logging.info(f"Tokenized and filtered {len(tokenized_sentences)} sentences from {file_path}")
     return tokenized_sentences
-
 
 # Create input-target pairs and save as JSON files
 def create_input_target_pairs(tokenized_sentences, output_dir, prefix, chunk_size=3000):
