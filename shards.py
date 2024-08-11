@@ -43,20 +43,25 @@ def save_data_per_node(train_data, rank, world_size, output_dir):
 
 # Tokenize and filter sentences
 def tokenize_and_filter_sentences(file_path, tokenizer):
-    with open(file_path, 'r') as f:
-        data = json.load(f)
-
     tokenized_sentences = []
-    for sentence in data['text']:
-        tokens = tokenizer.encode(sentence)
-        if len(tokens.ids) <= 256:
-            tokenized_sentences.append({
-                'input_tokens': tokens.tokens,
-                'input_ids': tokens.ids
-            })
+    with open(file_path, 'r') as f:
+        for line in f:
+            try:
+                entry = json.loads(line.strip())
+                sentence = entry.get('text', '')
+                tokens = tokenizer.encode(sentence)
+                if len(tokens.ids) <= 256:
+                    tokenized_sentences.append({
+                        'input_tokens': tokens.tokens,
+                        'input_ids': tokens.ids
+                    })
+            except json.JSONDecodeError as e:
+                logging.error(f"Error decoding JSON in file {file_path}: {e}")
+                continue
 
     logging.info(f"Tokenized and filtered {len(tokenized_sentences)} sentences from {file_path}")
     return tokenized_sentences
+
 
 # Create input-target pairs and save as JSON files
 def create_input_target_pairs(tokenized_sentences, output_dir, prefix, chunk_size=3000):
