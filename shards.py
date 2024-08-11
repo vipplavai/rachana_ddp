@@ -96,7 +96,9 @@ def prepare_shards(rank, world_size, output_dir):
     train_file = save_data_per_node(train_data, rank, world_size, output_dir)
 
     # Load the custom tokenizer
-    tokenizer = Tokenizer.from_file('telugu_tokenizer_50k.json')
+    tokenizer_path = os.path.join(os.path.dirname(__file__), 'telugu_tokenizer_50k.json')
+    tokenizer = Tokenizer.from_file(tokenizer_path)
+
 
     # Tokenize and filter the sentences
     tokenized_train = tokenize_and_filter_sentences(train_file, tokenizer)
