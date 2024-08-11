@@ -75,46 +75,6 @@ config = GPT2Config(
 model = GPT2LMHeadModel(config)
 model.to('cuda:0')
 
-# --- Main execution ---
-if __name__ == "__main__":
-    rank = int(os.environ['RANK'])
-    world_size = int(os.environ['WORLD_SIZE'])
-
-    # Setup DDP environment
-    setup(rank, world_size)
-
-    # Wrap the model with DDP after initializing the process group
-    model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[0], output_device=0, find_unused_parameters=True)
-
-    # Mixed precision and gradient accumulation setup
-    scaler = GradScaler()
-    gradient_accumulation_steps = 4  # Accumulate gradients over 4 batches
-    global_step = 0
-    total_steps = 0  # We'll track the total steps
-    total_tokens = 0  # Track the total number of tokens processed
-
-    # Optimizer and scheduler setup
-    optimizer = AdamW(model.parameters(), lr=5e-5, weight_decay=0.01)
-    scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=500, num_training_steps=100000)  # Just a placeholder value
-
-    # TensorBoard setup (only for rank 0)
-    if dist.get_rank() == 0:
-        writer = SummaryWriter(log_dir=os.path.join(output_dir, "logs"))
-
-    try:
-        # Prepare the shards
-        prepare_shards(rank, world_size, output_dir)
-
-        # Start training
-        train(model, checkpoint_interval=5000, print_loss_every=300)
-
-        # Evaluation should be performed only by the master node (rank 0)
-        if dist.get_rank() == 0:
-            evaluate(model, global_step=global_step, total_train_tokens=total_tokens)
-    finally:
-        if dist.get_rank() == 0:
-            writer.close()
-        cleanup(rank)
 
 # Dataset class
 class TextDataset(Dataset):
@@ -280,3 +240,44 @@ def save_checkpoint_and_embeddings(model, step, average_loss, best_checkpoints):
             os.remove(worst_checkpoint)
             os.remove(worst_embedding)
             logging.info(f"Removed old checkpoint and embeddings: {worst_checkpoint}, {worst_embedding}")
+
+# --- Main execution ---
+if __name__ == "__main__":
+    rank = int(os.environ['RANK'])
+    world_size = int(os.environ['WORLD_SIZE'])
+
+    # Setup DDP environment
+    setup(rank, world_size)
+
+    # Wrap the model with DDP after initializing the process group
+    model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[0], output_device=0, find_unused_parameters=True)
+
+    # Mixed precision and gradient accumulation setup
+    scaler = GradScaler()
+    gradient_accumulation_steps = 4  # Accumulate gradients over 4 batches
+    global_step = 0
+    total_steps = 0  # We'll track the total steps
+    total_tokens = 0  # Track the total number of tokens processed
+
+    # Optimizer and scheduler setup
+    optimizer = AdamW(model.parameters(), lr=5e-5, weight_decay=0.01)
+    scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=500, num_training_steps=100000)  # Just a placeholder value
+
+    # TensorBoard setup (only for rank 0)
+    if dist.get_rank() == 0:
+        writer = SummaryWriter(log_dir=os.path.join(output_dir, "logs"))
+
+    try:
+        # Prepare the shards
+        prepare_shards(rank, world_size, output_dir)
+
+        # Start training
+        train(model, checkpoint_interval=5000, print_loss_every=300)
+
+        # Evaluation should be performed only by the master node (rank 0)
+        if dist.get_rank() == 0:
+            evaluate(model, global_step=global_step, total_train_tokens=total_tokens)
+    finally:
+        if dist.get_rank() == 0:
+            writer.close()
+        cleanup(rank)

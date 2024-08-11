@@ -63,6 +63,7 @@ def tokenize_and_filter_sentences(file_path, tokenizer):
     return tokenized_sentences
 
 
+
 # Create input-target pairs and save as JSON files
 def create_input_target_pairs(tokenized_sentences, output_dir, prefix, chunk_size=3000):
     os.makedirs(output_dir, exist_ok=True)
@@ -87,10 +88,12 @@ def create_input_target_pairs(tokenized_sentences, output_dir, prefix, chunk_siz
                 })
 
         json_file = os.path.join(output_dir, f'{prefix}_chunk_{i}.json')
-        with open(json_file, 'w') as f:
-            json.dump(input_target_pairs, f)
+        with open(json_file, 'w', encoding='utf-8') as f:  # Ensure UTF-8 encoding
+            json.dump(input_target_pairs, f, ensure_ascii=False)  # Ensure proper encoding of non-ASCII characters
 
         logging.info(f"Saved chunk {i+1}/{num_chunks} to {json_file}")
+
+
 
 # Main function to prepare shards
 def prepare_shards(rank, world_size, output_dir):
@@ -102,8 +105,7 @@ def prepare_shards(rank, world_size, output_dir):
 
     # Load the custom tokenizer
     tokenizer_path = os.path.join(os.path.dirname(__file__), 'telugu_tokenizer_50k.json')
-    tokenizer = Tokenizer.from_file(tokenizer_path)
-
+    tokenizer = Tokenizer.from_file(tokenizer_path)  # Ensure this path is correct
 
     # Tokenize and filter the sentences
     tokenized_train = tokenize_and_filter_sentences(train_file, tokenizer)
@@ -122,6 +124,7 @@ def prepare_shards(rank, world_size, output_dir):
         create_input_target_pairs(tokenized_test, os.path.join(output_dir, 'test'), prefix='test')
 
         logging.info("Saved validation and test datasets on rank 0")
+
 
 # Run the shard preparation
 if __name__ == "__main__":
