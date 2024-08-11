@@ -46,7 +46,8 @@ def save_data_per_node(train_data, rank, world_size, output_dir):
         sentences = [{"Sentence": item['Sentence']} for item in node_data]
 
         with open(node_file, 'w', encoding='utf-8') as f:
-            json.dump(sentences, f, ensure_ascii=False, indent=4)  # Use indent for readability
+            for sentence in sentences:
+                f.write(json.dumps(sentence, ensure_ascii=False) + '\n')  # Write each sentence on a new line
 
         logging.info(f"Saved {len(sentences)} sentences to {node_file} for rank {rank}")
     
@@ -56,8 +57,9 @@ def save_data_per_node(train_data, rank, world_size, output_dir):
 def tokenize_and_filter_sentences(file_path, tokenizer):
     tokenized_sentences = []
     with open(file_path, 'r', encoding='utf-8') as f:
-        data = json.load(f)
-        for entry in data:
+        data = f.readlines()
+        for line in data:
+            entry = json.loads(line.strip())
             sentence = entry.get('Sentence', '')  # Use 'Sentence' as the key
             tokens = tokenizer.encode(sentence)
             if len(tokens.ids) <= 256:
@@ -96,7 +98,8 @@ def create_input_target_pairs(tokenized_sentences, output_dir, prefix, chunk_siz
 
         json_file = os.path.join(output_dir, f'{prefix}_chunk_{i}.json')
         with open(json_file, 'w', encoding='utf-8') as f:
-            json.dump(input_target_pairs, f, ensure_ascii=False)
+            for pair in input_target_pairs:
+                f.write(json.dumps(pair, ensure_ascii=False) + '\n')  # Write each pair on a new line
 
         logging.info(f"Saved chunk {i+1}/{num_chunks} to {json_file}")
 
@@ -120,28 +123,30 @@ def prepare_shards(rank, world_size, output_dir):
 
     # Only rank 0 handles validation and test data preparation
     if rank == 0:
-        valid_dir = os.path.join(output_dir, 'valid')
-        test_dir = os.path.join(output_dir, 'test')
-        os.makedirs(valid_dir, exist_ok=True)
-        os.makedirs(test_dir, exist_ok=True)
+        node_output_dir = os.path.dirname(__file__)  # Root directory where train.py is located
 
-        logging.info(f"Validation directory: {valid_dir}")
-        logging.info(f"Test directory: {test_dir}")
+        # Save valid and test data in the root directory
+        valid_data_file = os.path.join(node_output_dir, 'valid.json')
+        test_data_file = os.path.join(node_output_dir, 'test.json')
 
-        # Save valid and test data without using the encoding parameter
-        valid_data_file = os.path.join(valid_dir, 'valid.json')
-        test_data_file = os.path.join(test_dir, 'test.json')
-        
-        valid_data.to_json(valid_data_file, force_ascii=False)
-        test_data.to_json(test_data_file, force_ascii=False)
+        with open(valid_data_file, 'w', encoding='utf-8') as f:
+            for item in valid_data:
+                f.write(json.dumps({"Sentence": item['Sentence']}, ensure_ascii=False) + '\n')
+
+        with open(test_data_file, 'w', encoding='utf-8') as f:
+            for item in test_data:
+                f.write(json.dumps({"Sentence": item['Sentence']}, ensure_ascii=False) + '\n')
+
+        logging.info(f"Saved validation data to {valid_data_file}")
+        logging.info(f"Saved test data to {test_data_file}")
 
         # Process and save the tokenized data
         tokenized_valid = tokenize_and_filter_sentences(valid_data_file, tokenizer)
         tokenized_test = tokenize_and_filter_sentences(test_data_file, tokenizer)
 
-        # Save validation and test data
-        create_input_target_pairs(tokenized_valid, valid_dir, prefix='valid')
-        create_input_target_pairs(tokenized_test, test_dir, prefix='test')
+        # Save validation and test chunks in respective directories
+        create_input_target_pairs(tokenized_valid, os.path.join(output_dir, 'valid'), prefix='valid')
+        create_input_target_pairs(tokenized_test, os.path.join(output_dir, 'test'), prefix='test')
 
         logging.info("Saved validation and test datasets on rank 0")
 
