@@ -10,7 +10,11 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 # Load Hugging Face dataset and split
 def load_and_split_dataset():
     dataset = load_dataset('KPrashanth/Telugu_sentences', split='train')
+    count_sentences = len(dataset)
+    sample_size= int(0.1 * count_sentences)
+    dataset = dataset.shuflle(seed=42).select(range(sample_size))
     total_sentences = len(dataset)
+    
     
     # Calculate splits
     train_size = int(0.8 * total_sentences)
