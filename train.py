@@ -406,7 +406,7 @@ def calculate_perplexity(loss):
     return torch.exp(loss)
 
 # Function to push selected files to Hugging Face repository
-def push_to_huggingface_repo():
+def push_to_huggingface_repo(best_checkpoints):
     api = HfApi()
     repo_id = os.environ['HUGGINGFACE_REPO_ID']
     token = os.environ['HUGGINGFACE_TOKEN']
@@ -414,8 +414,13 @@ def push_to_huggingface_repo():
     # Initialize repository
     repo = Repository(local_dir=output_dir, clone_from=repo_id, use_auth_token=token)
     
-    # List of files to include in the upload
-    files_to_include = ["train.py", "auto.py", "metrics.csv", "epoch_1.pt", "epoch_1_embeddings.pt", "README.md", ".gitattributes"]
+    # Include the best two model checkpoints and embeddings
+    files_to_include = ["train.py", "auto.py", "metrics.csv", "README.md", ".gitattributes"]
+    
+    # Add the best checkpoint and embedding files
+    for checkpoint, embedding, _ in best_checkpoints:
+        files_to_include.append(checkpoint)
+        files_to_include.append(embedding)
 
     # Upload the selected files
     for file in files_to_include:
@@ -426,7 +431,8 @@ def push_to_huggingface_repo():
             print(f"File {file_path} does not exist and will not be uploaded.")
     
     # Commit and push to Hugging Face Hub
-    repo.push_to_hub(commit_message="Updated model and training files, excluding input-target pairs JSON files.")
+    repo.push_to_hub(commit_message="Updated model and training files, including best model checkpoints and embeddings.")
+
     
 
 # --- Main execution ---
