@@ -6,9 +6,13 @@ import psutil
 import threading
 import datetime
 import csv
+from flask import Flask, render_template_string
+
+app = Flask(__name__)
 
 logs = {
-    "master": ""
+    "master": "",
+    "workers": []
 }
 
 def kill_process_on_port(port):
@@ -109,6 +113,43 @@ def read_nodes_from_csv(file_path):
                 workers.append({"hostname": row["hostname"], "username": row["username"]})
     return master, workers
 
+def start_flask():
+    @app.route("/")
+    def index():
+        return render_template_string("""
+        <!doctype html>
+        <html>
+        <head><title>Training Logs</title></head>
+        <body>
+            <h1>Training Logs</h1>
+            <ul>
+                <li><a href="/logs/master">Master Node Logs ({{ logs['master']['username'] }})</a></li>
+                {% for worker in logs['workers'] %}
+                <li><a href="/logs/{{ worker['key'] }}">{{ worker['name'] }} Logs ({{ worker['username'] }})</a></li>
+                {% endfor %}
+            </ul>
+        </body>
+        </html>
+        """, logs=logs)
+
+    @app.route("/logs/<node>")
+    def logs_view(node):
+        if node == 'master':
+            return logs['master']['log'].replace("\n", "<br>")
+        else:
+            for worker in logs['workers']:
+                if worker['key'] == node:
+                    return logs[worker['key']]['log'].replace("\n", "<br>")
+        return "No logs available"
+
+    while True:
+        try:
+            app.run(host="0.0.0.0", port=5000)
+        except Exception as e:
+            print(f"Flask server crashed: {e}")
+            time.sleep(5)
+            print("Restarting Flask server...")
+
 if __name__ == "__main__":
     nodes_csv = "nodes.csv"
     master, workers = read_nodes_from_csv(nodes_csv)
@@ -141,6 +182,10 @@ if __name__ == "__main__":
     # Kill any process using the port on the master node
     kill_process_on_port(master_port)
 
+    # Start the Flask server in a separate thread
+    flask_thread = threading.Thread(target=start_flask)
+    flask_thread.start()
+
     # Run script on master node (rank 0) in a separate thread
     logs['master'] = {
         "username": master["username"],
@@ -169,3 +214,5 @@ if __name__ == "__main__":
 
     # Wait for master process to complete
     master_process.wait()
+
+    flask_thread.join()
