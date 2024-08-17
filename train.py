@@ -142,7 +142,7 @@ tokenizer = Tokenizer.from_file(tokenizer_path)
 def load_and_split_dataset():
     dataset = load_dataset('KPrashanth/Telugu_sentences', split='train')
     count_sentences = len(dataset)
-    sample_size = int(0.00001 * count_sentences)  # Take 1% of the data
+    sample_size = int(0.0005 * count_sentences)  # Take 1% of the data
     dataset = dataset.shuffle(seed=42).select(range(sample_size))
     total_sentences = len(dataset)
     logging.info(f"Total sentences in sampled dataset: {total_sentences}")
