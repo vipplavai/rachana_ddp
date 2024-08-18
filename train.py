@@ -138,15 +138,16 @@ script_dir = os.path.dirname(os.path.realpath(__file__))
 tokenizer_path = os.path.join(script_dir, 'telugu_tokenizer_50k.json')
 tokenizer = Tokenizer.from_file(tokenizer_path)
 
-# Function to load Hugging Face dataset and split
-def load_and_split_dataset():
-    dataset = load_dataset('KPrashanth/Telugu_sentences', split='train')
-    count_sentences = len(dataset)
-    sample_size = int(0.0005 * count_sentences)  # Take 1% of the data
-    dataset = dataset.shuffle(seed=42).select(range(sample_size))
-    total_sentences = len(dataset)
-    logging.info(f"Total sentences in sampled dataset: {total_sentences}")
+# Function to load the preprocessed dataset from Hugging Face
+def load_preprocessed_dataset():
+    dataset = load_dataset(
+        os.environ['HUGGINGFACE_REPO_ID'], 
+        data_files={'train': 'tel_input_target_pairs.json'}, 
+        split='train'
+    )
+    logging.info(f"Loaded dataset from Hugging Face with {len(dataset)} samples.")
     return dataset
+
 
 # Function to create input-target pairs
 def create_input_target_pairs(tokenized_sentences):
@@ -261,15 +262,6 @@ def evaluate(model, epoch, dataloader):
     return avg_loss
 
 
-import os
-import time
-import torch
-import torch.distributed as dist
-from torch.utils.data import DataLoader, DistributedSampler
-from torch.cuda.amp import autocast, GradScaler
-from tqdm import tqdm
-
-# Training loop with epoch-based processing
 def train(model, num_epochs, print_loss_every=300):  # Pass num_epochs as a parameter
     global total_steps, total_tokens
     model.train()
@@ -277,15 +269,15 @@ def train(model, num_epochs, print_loss_every=300):  # Pass num_epochs as a para
     best_checkpoints = []
     csv_file = os.path.join(output_dir, "metrics.csv")
 
-    dataset = load_and_split_dataset()
-    shard_file = process_dataset(dataset, rank, world_size)
-    input_ids, target_ids = load_data_from_shard(shard_file)
-    train_dataset = TextDataset(input_ids, target_ids)
-    batch_size = 8
+    # Load the preprocessed dataset from Hugging Face
+    dataset = load_preprocessed_dataset()
+
+    # Create a distributed sampler for the dataset
+    train_sampler = DistributedSampler(dataset, num_replicas=world_size, rank=rank)
     
-    train_sampler = DistributedSampler(train_dataset)
-    train_dataloader = DataLoader(train_dataset, batch_size=batch_size, collate_fn=collate_fn, sampler=train_sampler)
-    
+    # Create DataLoader with the distributed sampler
+    train_dataloader = DataLoader(dataset, batch_size=batch_size, collate_fn=collate_fn, sampler=train_sampler)
+
     for epoch in range(1, num_epochs + 1):  # Use num_epochs here
         total_loss = 0
         total_train_tokens = 0
@@ -295,7 +287,7 @@ def train(model, num_epochs, print_loss_every=300):  # Pass num_epochs as a para
         logging.info(f"[Rank {rank}] Epoch {epoch} training started.")
 
         if dist.get_rank() == 0:
-            batch_progress = tqdm(train_dataloader, desc=f"[Rank {rank}] Training on {shard_file}", leave=True, dynamic_ncols=True)
+            batch_progress = tqdm(train_dataloader, desc=f"[Rank {rank}] Training on dataset", leave=True, dynamic_ncols=True)
         else:
             batch_progress = tqdm(train_dataloader, desc=f"[Rank {rank}] Training", leave=True, dynamic_ncols=True)
 
