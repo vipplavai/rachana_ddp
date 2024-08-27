@@ -1,5 +1,6 @@
 import os
 import sys
+import subprocess
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -16,38 +17,6 @@ from datetime import datetime
 import hashlib
 import shutil
 from torch.utils.tensorboard import SummaryWriter
-import subprocess
-
-
-def kill_existing_cuda_processes():
-    try:
-        # Find processes using nvidia-smi
-        process_output = subprocess.check_output(['nvidia-smi', '--query-compute-apps=pid,process_name,used_memory', '--format=csv,noheader,nounits']).decode('utf-8')
-        process_lines = process_output.strip().split('\n')
-
-        for line in process_lines:
-            if line:
-                pid, process_name, used_memory = line.split(',')
-                pid = pid.strip()
-                process_name = process_name.strip()
-                used_memory = used_memory.strip()
-
-                # Log the processes that are being killed
-                logging.info(f"Killing process {process_name} with PID {pid} using {used_memory}MB memory")
-                
-                # Kill the process
-                os.kill(int(pid), 9)
-                
-        logging.info("All existing CUDA processes have been killed.")
-
-    except subprocess.CalledProcessError as e:
-        logging.error(f"Failed to retrieve CUDA processes. Error: {e}")
-    except Exception as ex:
-        logging.error(f"An error occurred while killing CUDA processes: {ex}")
-
-# Call this function at the beginning of your script
-kill_existing_cuda_processes()
-
 
 # Set up logging
 log_dir = "./logs"
@@ -64,8 +33,43 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s %(message)s', handle
 os.environ['NCCL_DEBUG'] = 'INFO'
 os.environ['NCCL_SOCKET_TIMEOUT'] = '200'  # Increase timeout to avoid premature termination
 
+# Function to kill existing CUDA processes except the current one
+def kill_existing_cuda_processes():
+    current_pid = os.getpid()
+    try:
+        # Fetch all processes using NVIDIA GPUs
+        output = subprocess.check_output(['nvidia-smi', '--query-compute-apps=pid', '--format=csv,noheader'])
+        pids = [int(pid) for pid in output.decode().splitlines() if pid.isdigit()]
+        
+        # Kill all processes except the current one
+        for pid in pids:
+            if pid != current_pid:
+                logging.info(f"Killing CUDA process with PID: {pid}")
+                os.kill(pid, 9)
+    except Exception as e:
+        logging.error(f"Failed to kill existing CUDA processes: {e}")
+
+# Function to print GPU power usage
+def print_gpu_power(rank):
+    try:
+        # Fetch power usage information using nvidia-smi
+        output = subprocess.check_output(['nvidia-smi', '--query-gpu=power.draw', '--format=csv,noheader,nounits'])
+        power_readings = [float(power) for power in output.decode().splitlines()]
+        total_power = sum(power_readings)
+        
+        for i, power in enumerate(power_readings):
+            logging.info(f"[Rank {rank}] GPU {i} Power Usage: {power} W")
+        
+        logging.info(f"[Rank {rank}] Total Power Usage: {total_power} W")
+        return total_power
+    except Exception as e:
+        logging.error(f"Failed to retrieve GPU power usage: {e}")
+        return 0
+
 # --- Setup Function ---
 def setup(rank, world_size):
+    kill_existing_cuda_processes()  # Kill existing CUDA processes at the start
+
     os.environ['MASTER_ADDR'] = '192.168.1.15'
     os.environ['MASTER_PORT'] = '29500'
     logging.info(f"[Rank {rank}] Setting up the distributed environment: MASTER_ADDR={os.environ['MASTER_ADDR']}, MASTER_PORT={os.environ['MASTER_PORT']}, World Size={world_size}")
@@ -73,6 +77,16 @@ def setup(rank, world_size):
     torch.cuda.set_device(0)
     logging.info(f"[Rank {rank}] Distributed environment setup complete.")
     dist.barrier()
+
+    # Print GPU power usage for this rank
+    total_power = print_gpu_power(rank)
+    dist.barrier()
+
+    # Collectively aggregate the power usage across all ranks
+    collective_power = torch.tensor([total_power], dtype=torch.float32).cuda(0)
+    dist.all_reduce(collective_power, op=dist.ReduceOp.SUM)
+    if rank == 0:
+        logging.info(f"[Rank 0] Collective GPU Power Usage: {collective_power.item()} W")
 
 # --- Cleanup Function ---
 def cleanup(rank):
