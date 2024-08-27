@@ -75,6 +75,91 @@ def dynamic_padding_collate_fn(batch, tokenizer):
         'labels': padded_labels
     }
 
+# --- Hash Calculation Function ---
+def calculate_hash(filepath, hash_func=hashlib.md5):
+    """Calculates the hash of the file to check for integrity."""
+    hash_obj = hash_func()
+    with open(filepath, 'rb') as f:
+        for chunk in iter(lambda: f.read(4096), b""):
+            hash_obj.update(chunk)
+    return hash_obj.hexdigest()
+
+def calculate_directory_hash(dir_path, hash_func=hashlib.md5):
+    """Calculates the hash of all files in a directory to check for integrity."""
+    if not os.path.isdir(dir_path):
+        logging.error(f"Directory does not exist: {dir_path}")
+        return None
+    
+    hash_obj = hash_func()
+    for root, dirs, files in os.walk(dir_path):
+        for file in sorted(files):
+            file_path = os.path.join(root, file)
+            with open(file_path, 'rb') as f:
+                for chunk in iter(lambda: f.read(4096), b""):
+                    hash_obj.update(chunk)
+    return hash_obj.hexdigest()
+
+# --- Download and Verify Dataset ---
+def download_and_verify_dataset(dataset_name, local_dir, token):
+    """Downloads the dataset if not present or verifies its integrity if present."""
+    dataset_path = os.path.join(local_dir, dataset_name.replace('/', '_'))
+    dataset_cache = os.path.join(local_dir, "datasets")
+    if not os.path.exists(dataset_cache):
+        os.makedirs(dataset_cache)
+
+    if os.path.exists(dataset_path):
+        logging.info(f"Dataset found locally. Verifying integrity.")
+        local_hash = calculate_directory_hash(dataset_path)
+        if local_hash is None:
+            logging.error(f"Failed to calculate local hash for dataset at {dataset_path}")
+            return None
+
+        remote_dataset = load_dataset(dataset_name, cache_dir=dataset_cache, token=token)
+        temp_dataset_path = os.path.join(local_dir, "temp_dataset")
+        remote_dataset.save_to_disk(temp_dataset_path)
+        remote_hash = calculate_directory_hash(temp_dataset_path)
+        if remote_hash is None:
+            logging.error(f"Failed to calculate remote hash for dataset at {temp_dataset_path}")
+            shutil.rmtree(temp_dataset_path)
+            return None
+        
+        shutil.rmtree(temp_dataset_path)
+        if local_hash != remote_hash:
+            logging.info(f"Dataset integrity mismatch. Re-downloading dataset.")
+            shutil.rmtree(dataset_path)
+            dataset = load_dataset(dataset_name, cache_dir=dataset_cache, token=token)
+            dataset.save_to_disk(dataset_path)
+            logging.info(f"Dataset downloaded successfully.")
+        else:
+            logging.info(f"Dataset integrity verified.")
+            dataset = DatasetDict.load_from_disk(dataset_path)
+    else:
+        logging.info(f"Dataset not found locally. Downloading to {dataset_path}.")
+        dataset = load_dataset(dataset_name, cache_dir=dataset_cache, token=token)
+        dataset.save_to_disk(dataset_path)
+        logging.info(f"Dataset downloaded successfully.")
+    return dataset
+
+# --- Load Shard Function ---
+def load_shard(rank, world_size, local_data_dir, dataset_name):
+    dataset_path = os.path.join(local_data_dir, dataset_name.replace('/', '_'))
+    logging.info(f"[Rank {rank}] Loading dataset from {dataset_path}.")
+    dataset_dict = DatasetDict.load_from_disk(dataset_path)
+    
+    logging.info(f"[Rank {rank}] Sharding dataset.")
+    shard_dict = {}
+    for split, dataset in dataset_dict.items():
+        shard_dict[split] = dataset.shard(num_shards=world_size, index=rank)
+    
+    shard_path = os.path.join(local_data_dir, f'shard_{rank}')
+    DatasetDict(shard_dict).save_to_disk(shard_path)
+    logging.info(f"[Rank {rank}] Shard saved to {shard_path}.")
+    
+    shard = DatasetDict.load_from_disk(shard_path)
+    logging.info(f"[Rank {rank}] Shard sizes: { {split: len(shard[split]) for split in shard} }")
+    
+    return shard
+
 # --- Training Function ---
 def train(rank, world_size):
     setup(rank, world_size)
