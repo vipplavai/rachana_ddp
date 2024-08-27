@@ -16,6 +16,38 @@ from datetime import datetime
 import hashlib
 import shutil
 from torch.utils.tensorboard import SummaryWriter
+import subprocess
+
+
+def kill_existing_cuda_processes():
+    try:
+        # Find processes using nvidia-smi
+        process_output = subprocess.check_output(['nvidia-smi', '--query-compute-apps=pid,process_name,used_memory', '--format=csv,noheader,nounits']).decode('utf-8')
+        process_lines = process_output.strip().split('\n')
+
+        for line in process_lines:
+            if line:
+                pid, process_name, used_memory = line.split(',')
+                pid = pid.strip()
+                process_name = process_name.strip()
+                used_memory = used_memory.strip()
+
+                # Log the processes that are being killed
+                logging.info(f"Killing process {process_name} with PID {pid} using {used_memory}MB memory")
+                
+                # Kill the process
+                os.kill(int(pid), 9)
+                
+        logging.info("All existing CUDA processes have been killed.")
+
+    except subprocess.CalledProcessError as e:
+        logging.error(f"Failed to retrieve CUDA processes. Error: {e}")
+    except Exception as ex:
+        logging.error(f"An error occurred while killing CUDA processes: {ex}")
+
+# Call this function at the beginning of your script
+kill_existing_cuda_processes()
+
 
 # Set up logging
 log_dir = "./logs"
