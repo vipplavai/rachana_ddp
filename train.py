@@ -28,12 +28,13 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s %(message)s', handle
     logging.StreamHandler(sys.stdout)
 ])
 
-# Set NCCL debugging level
+# Set NCCL debugging and timeout levels
 os.environ['NCCL_DEBUG'] = 'INFO'
+os.environ['NCCL_SOCKET_TIMEOUT'] = '200'  # Increase timeout to avoid premature termination
 
 # --- Setup Function ---
 def setup(rank, world_size):
-    os.environ['MASTER_ADDR'] = '172.26.115.220'
+    os.environ['MASTER_ADDR'] = '192.168.1.15'
     os.environ['MASTER_PORT'] = '29500'
     logging.info(f"[Rank {rank}] Setting up the distributed environment: MASTER_ADDR={os.environ['MASTER_ADDR']}, MASTER_PORT={os.environ['MASTER_PORT']}, World Size={world_size}")
     dist.init_process_group("nccl", rank=rank, world_size=world_size)
@@ -168,7 +169,7 @@ def train(rank, world_size):
     hf_token = "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"
     local_data_dir = "./data"
     dataset_name = "Vipplav/telugu_pairs_1m"
-    tokenizer_path = "./custom_tokenizer"
+    tokenizer_path = "custom_tokenizer/telugu_tokenizer_50k.json"
 
     # Download and verify dataset
     logging.info(f"[Rank {rank}] Checking dataset integrity and downloading if necessary.")
