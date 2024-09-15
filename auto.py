@@ -41,7 +41,7 @@ def stream_output(process, log_key):
             add_timestamped_log(log_key, output.strip())
             print(output, end='')
 
-def run_torchrun_locally(script_path, rank, world_size, master_addr, master_port, log_key):
+def run_torchrun_locally(script_path, rank, world_size, master_addr, master_port, log_key, start_phase, end_phase):
     env = os.environ.copy()
     env['RANK'] = str(rank)
     env['WORLD_SIZE'] = str(world_size)
@@ -58,13 +58,15 @@ def run_torchrun_locally(script_path, rank, world_size, master_addr, master_port
         '--node_rank={}'.format(rank),
         '--master_addr={}'.format(master_addr),
         '--master_port={}'.format(master_port),
-        script_path
+        script_path,
+        '--start_phase', str(start_phase),
+        '--end_phase', str(end_phase)
     ]
     process = subprocess.Popen(command, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, bufsize=1, universal_newlines=True)
     threading.Thread(target=stream_output, args=(process, log_key)).start()
     return process
 
-def run_torchrun_remotely(hostname, username, script_path, rank, world_size, master_addr, master_port, conda_env, log_key):
+def run_torchrun_remotely(hostname, username, script_path, rank, world_size, master_addr, master_port, conda_env, log_key, start_phase, end_phase):
     ssh = paramiko.SSHClient()
     ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
 
@@ -86,7 +88,7 @@ def run_torchrun_remotely(hostname, username, script_path, rank, world_size, mas
     export CUDA_HOME=/usr/local/cuda && \
     export PATH=/usr/local/cuda/bin:$PATH && \
     export LD_LIBRARY_PATH=/usr/local/cuda/lib64:$LD_LIBRARY_PATH && \
-    torchrun --nproc_per_node=1 --nnodes={world_size} --node_rank={rank} --master_addr={master_addr} --master_port={master_port} {script_path}
+    torchrun --nproc_per_node=1 --nnodes={world_size} --node_rank={rank} --master_addr={master_addr} --master_port={master_port} {script_path} --start_phase {start_phase} --end_phase {end_phase}
     """
     stdin, stdout, stderr = ssh.exec_command(command)
 
@@ -164,6 +166,10 @@ if __name__ == "__main__":
     master_port = 29500
     world_size = 1 + len(workers)  # 1 master + number of workers
 
+    # Specify start and end phases for the training
+    start_phase = 1  # Example start phase, modify as needed
+    end_phase = 4    # Example end phase, modify as needed
+
     # Ensure logs directory exists
     os.makedirs('logs', exist_ok=True)
 
@@ -171,7 +177,7 @@ if __name__ == "__main__":
     logs['workers'] = []
     for i, worker in enumerate(workers, start=1):
         worker_key = f"worker_{i}"
-        logs[worker_key] = {"log": ""}  # Properly initialize log entry for each worker
+        logs[worker_key] = {"log": ""}
         logs['workers'].append({
             "key": worker_key,
             "name": f"Worker {i}",
@@ -192,7 +198,7 @@ if __name__ == "__main__":
         "log": ""
     }
     master_script_path = script_path.format(username=master["username"])
-    master_process = run_torchrun_locally(master_script_path, rank=0, world_size=world_size, master_addr=master_addr, master_port=master_port, log_key="master")
+    master_process = run_torchrun_locally(master_script_path, rank=0, world_size=world_size, master_addr=master_addr, master_port=master_port, log_key="master", start_phase=start_phase, end_phase=end_phase)
 
     # Allow some time for the master node to set up
     time.sleep(5)
@@ -203,7 +209,7 @@ if __name__ == "__main__":
         worker_script_path = script_path.format(username=worker["username"])
         thread = threading.Thread(
             target=run_torchrun_remotely,
-            args=(worker["hostname"], worker["username"], worker_script_path, i, world_size, master_addr, master_port, conda_env, f"worker_{i}")
+            args=(worker["hostname"], worker["username"], worker_script_path, i, world_size, master_addr, master_port, conda_env, f"worker_{i}", start_phase, end_phase)
         )
         worker_threads.append(thread)
         thread.start()
