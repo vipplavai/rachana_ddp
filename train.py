@@ -177,7 +177,9 @@ def download_datasets(config, start_phase, end_phase):
     """
     Download datasets for the specified phases, verify integrity, and save them locally.
     """
-    data_dir = "/home/enma/Rachana50M/data"
+    # Get the base path from the configuration, defaulting to '~/rachana_ddp' if not provided
+    base_path = os.path.expanduser(config.get("base_path", "~/rachana_ddp"))
+    data_dir = os.path.join(base_path, "data")
     os.makedirs(data_dir, exist_ok=True)
 
     logging.info("\nDownloading datasets...")
@@ -200,6 +202,7 @@ def download_datasets(config, start_phase, end_phase):
                 logging.error(f"Failed to download dataset {dataset_name} for Phase {phase_num}. Error: {e}")
         else:
             logging.error(f"Phase {phase_num} configuration not found in the config file.")
+
 
 def load_model_config(config_path):
     """
@@ -400,13 +403,13 @@ def main():
     home_dir = os.path.expanduser("~")
 
     # Load configuration
-    config_path = os.path.join(home_dir, "Rachana50M/config/config.json")
+    config_path = os.path.join(home_dir, "rachana_ddp/config/config.json")
     if not os.path.exists(config_path):
         logging.error(f"Configuration file not found at: {config_path}")
         return
     
     config = load_config(config_path)
-    base_path = os.path.expanduser(config.get("base_path", "~/Rachana50M"))  # Expand base path
+    base_path = os.path.expanduser(config.get("base_path", "~/rachana_ddp"))  # Expand base path
 
     # Set paths
     data_dir = os.path.join(base_path, "data")
