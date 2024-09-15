@@ -1,0 +1,103 @@
+{
+    "model_config": {
+        "vocab_size": 50000,
+        "n_positions": 512,
+        "n_ctx": 512,
+        "embedding_size": 528,
+        "num_layers": 7,
+        "num_heads": 8,
+        "activation_function": "gelu",
+        "dropout_rate": 0.1,
+        "initializer_range": 0.02,
+        "layer_norm_epsilon": 1e-5,
+        "pad_token_id": 0,
+        "bos_token_id": 1,
+        "eos_token_id": 2
+    },
+    "training_control": {
+        "start_phase": 1,
+        "end_phase": 5
+    },
+    "phases": {
+        "phase1": {
+            "batch_size": 32,
+            "learning_rate": 5e-5,
+            "epochs": 10,
+            "early_stopping_patience": 2,
+            "gradient_accumulation_steps": 1,
+            "warmup_steps": 500,
+            "max_grad_norm": 1.0,
+            "save_steps": 1000,
+            "logging_steps": 100,
+            "evaluation_strategy": "epoch",
+            "checkpoint_dir": "models/phase1",
+            "log_dir": "logs/phase1",
+            "dataset_name": "dataset-phase1",
+            "load_best_model_at_end": true
+        },
+        "phase2": {
+            "batch_size": 32,
+            "learning_rate": 3e-5,
+            "epochs": 8,
+            "early_stopping_patience": 3,
+            "gradient_accumulation_steps": 2,
+            "warmup_steps": 300,
+            "max_grad_norm": 1.0,
+            "save_steps": 1000,
+            "logging_steps": 100,
+            "evaluation_strategy": "epoch",
+            "checkpoint_dir": "models/phase2",
+            "log_dir": "logs/phase2",
+            "dataset_name": "dataset-phase2",
+            "load_best_model_at_end": true
+        },
+        "phase3": {
+            "batch_size": 32,
+            "learning_rate": 2e-5,
+            "epochs": 12,
+            "early_stopping_patience": 4,
+            "gradient_accumulation_steps": 2,
+            "warmup_steps": 200,
+            "max_grad_norm": 1.0,
+            "save_steps": 1000,
+            "logging_steps": 100,
+            "evaluation_strategy": "epoch",
+            "checkpoint_dir": "models/phase3",
+            "log_dir": "logs/phase3",
+            "dataset_name": "dataset-phase3",
+            "load_best_model_at_end": true
+        },
+        "phase4": {
+            "batch_size": 32,
+            "learning_rate": 1.5e-5,
+            "epochs": 10,
+            "early_stopping_patience": 3,
+            "gradient_accumulation_steps": 1,
+            "warmup_steps": 200,
+            "max_grad_norm": 1.0,
+            "save_steps": 1000,
+            "logging_steps": 100,
+            "evaluation_strategy": "epoch",
+            "checkpoint_dir": "models/phase4",
+            "log_dir": "logs/phase4",
+            "dataset_name": "dataset-phase4",
+            "load_best_model_at_end": true
+        },
+        "phase5": {
+            "batch_size": 32,
+            "learning_rate": 1e-5,
+            "epochs": 15,
+            "early_stopping_patience": 4,
+            "gradient_accumulation_steps": 2,
+            "warmup_steps": 100,
+            "max_grad_norm": 1.0,
+            "save_steps": 1000,
+            "logging_steps": 100,
+            "evaluation_strategy": "epoch",
+            "checkpoint_dir": "models/phase5",
+            "log_dir": "logs/phase5",
+            "dataset_name": "dataset-phase5",
+            "load_best_model_at_end": true
+        }
+    }
+}
